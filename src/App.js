@@ -6,66 +6,68 @@ export default class App extends Component{
   constructor(){
     super()
     this.state = {
-      products: [],
-      productId: '',
+      selectedProd: {},
+      selectedSpecialProd: {},
+      specialProd: [],
+      regularProd: []
     }
     this.toggleSpecial = this.toggleSpecial.bind(this)
     this.onSave = this.onSave.bind(this)
-    this.onUpdateSpecial = this.onUpdateSpecial.bind(this)
-    this.onSaveSpecial = this.onSaveSpecial.bind(this)
+    this.makeRegular = this.makeRegular.bind(this)
+    this.makeSpecial = this.makeSpecial.bind(this)
   }
   
   componentDidMount(){
+    const specialProd = []
+    const regularProd = []
     axios.get('/api/products')
       .then(res => res.data)
-      .then( products => this.setState({ products }))
+      .then( products => products.map( product =>{
+        return product.isSpecial ? specialProd.push(product) : regularProd.push(product)
+      }))
+      .then(()=> this.setState({ specialProd, regularProd })) 
   }
 
-  toggleSpecial(ev){
-    ev.preventDefault()
-    this.setState({productId: ev.target.value})
+  toggleSpecial(ev) {
+    const id = ev.target.value
+    const allProducts = this.state.specialProd.concat(this.state.regularProd)
+    const prod = allProducts.find(product => product.id === id * 1)
+    prod.isSpecial ? this.setState({ selectedProd: prod }) : this.setState({ selectedSpecialProd: prod })
   }
 
   onSave(ev){
     ev.preventDefault()
-    const { products, productId } = this.state
-    const product = products.find( product => product.id === productId*1 )
-    this.onUpdateSpecial(product)
+    this.state.selectedProd.name ? this.makeRegular(this.state.selectedProd) : this.makeSpecial(this.state.selectedSpecialProd)
   }
 
-  onSaveSpecial(ev){
-    ev.preventDefault()
-    const { products, productId } = this.state
-    const product = products.find( product => product.id === productId*1 )
-    this.onUpdateSpecial(product)
-  }
-
-  onUpdateSpecial(product){
-    const special = product.isSpecial ? false : true
+  makeRegular(product) {
     axios.put(`/api/products/${product.id}`, product)
-      .then(result => result.data)
+      .then( res => res.data)
       .then( product => {
-        const products = this.state.products.map(_product=>{
-          if(_product.id === product.id*1){
-            product.isSpecial = special
-            return product
-          }
-          return _product
-        })
-        this.setState({ products })
+        const newProduct = this.state.specialProd.filter(_product => _product.id !== product.id)
+        this.setState({ specialProd: newProduct, regularProd: [...this.state.regularProd, product] })
       })
+      .then(() => this.setState({ selectedProd: {} }))
+  }
+
+  makeSpecial(product) {
+    axios.put(`/api/products/${product.id}`, product)
+      .then( res => res.data)
+      .then( product => {
+        const newProduct = this.state.regularProd.filter(_product => _product.id !== product.id)
+        this.setState({ regularProd: newProduct, specialProd: [...this.state.specialProd, product] })
+      })
+      .then(() => this.setState({ selectedSpecialProd: {} }))
   }
 
   render(){
-    const { products, productId } = this.state;
-    const { toggleSpecial, onSave, onSaveSpecial } = this;
-    const specialLength = products.filter( product => product.isSpecial).length;
+    const { selectedProd, selectedSpecialProd, specialProd, regularProd } = this.state;
+    const { toggleSpecial, onSave, toggleRegular } = this;
     return(
       <div>
-        <h1> Acme Product Specials </h1>
-        <h2> We've got {specialLength} special products</h2>
-        <Products products={products} productId={productId} onSaveSpecial={onSaveSpecial} toggleSpecial={toggleSpecial} onSave={onSave}/>
+        
+        <Products selectedProd={selectedProd} selectedSpecialProd={selectedSpecialProd} specialProd={specialProd} regularProd={regularProd} toggleSpecial={toggleSpecial} toggleRegular={toggleRegular} onSave={onSave}/>
       </div>
-    ) 
+      ) 
   }
 }
